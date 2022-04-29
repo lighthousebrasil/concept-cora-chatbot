@@ -57,9 +57,15 @@ function initSdk(name) {
   }
   var Bots;
 
-  var locale = sessionStorage.getItem('languageTag');
-  var speechLocale = locale == 'pt_BR' ? 'pt-br' : locale == 'es' ? 'es-es' :'en-us';
-  var skillVoices = locale == 'pt_BR' ? skillVoicePT : locale == 'es' ? skillVoiceES :skillVoiceEN;
+  var locale = sessionStorage.getItem("languageTag");
+  var speechLocale =
+    locale == "pt_BR" ? "pt-br" : locale == "es" ? "es-es" : "en-us";
+  var skillVoices =
+    locale == "pt_BR"
+      ? skillVoicePT
+      : locale == "es"
+      ? skillVoiceES
+      : skillVoiceEN;
 
   setTimeout(function () {
     /**
@@ -88,8 +94,8 @@ function initSdk(name) {
           surname: sessionStorage.getItem("surname"),
           email: sessionStorage.getItem("email"),
           languageTag: sessionStorage.getItem("languageTag"),
-          passInt: sessionStorage.getItem("passInt")
-        }
+          passInt: sessionStorage.getItem("passInt"),
+        },
       },
       enableTimestamp: true,
       showConnectionStatus: true,
@@ -101,6 +107,7 @@ function initSdk(name) {
       enableSecureConnection: true,
       initBotAudioMuted: true,
       openChatOnLoad: true,
+      initBotAudioMuted: false,
       skillVoices: skillVoices,
       conversationBeginPosition: "bottom",
       font: '14px "Mier B", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
@@ -221,23 +228,63 @@ function initSdk(name) {
           errorSpeechUnsupportedLocale:
             "El navegador utilizado para la detección de voz no es compatible. No se puede iniciar la voz.",
           card: "Tarjeta",
-        }
+        },
       },
     };
 
     // Initialize SDK
     Bots = new WebSDK(chatWidgetSettings);
 
-    Bots.setSize('100vw' ,'100vh');
+    Bots.setSize("100vw", "100vh");
+
+    var speech = new SpeechSynthesisUtterance();
+
+    speech.lang = "pt-BR";
+    speech.rate = 1;
+    speech.pitch = 1;
+    speech.volume = 1;
 
     // Connect to skill when the widget is expanded for the first time
     var isFirstConnection = true;
     Bots.on(WebSDK.EVENT.WIDGET_OPENED, function () {
       if (isFirstConnection) {
-        Bots.connect()
+        Bots.connect();
         isFirstConnection = false;
       }
     });
+
+    let isFirstMessage = true;
+
+    Bots.on("message", (o) => {
+      if (!o.messagePayload.text && !isFirstMessage) return;
+
+      speech.text = o.messagePayload.text.replace(/<[^>]*>/g, "");
+      window.speechSynthesis.speak(speech);
+
+      isFirstMessage = false;
+    });
+
+    speech.onend = function (event) {
+      console.log("Speech has finished");
+    };
+    speech.onerror = function (event) {
+      console.log("Speech has finished with error: " + event.error);
+    };
+    speech.onstart = function (event) {
+      console.log("Speech has started");
+    };
+    speech.onpause = function (event) {
+      console.log("Speech has paused");
+    };
+    speech.onresume = function (event) {
+      console.log("Speech has resumed");
+    };
+    speech.onmark = function (event) {
+      console.log("Speech has marked");
+    };
+    speech.onboundary = function (event) {
+      console.log("Speech has reached a boundary");
+    };
 
     Bots.openChat();
 
