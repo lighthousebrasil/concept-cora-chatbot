@@ -1,5 +1,65 @@
 "use strict";
 
+var audioRecorder = {
+  /** Stores the recorded audio as Blob objects of audio data as the recording continues*/
+  audioBlobs: [] /*of type Blob[]*/,
+  /** Stores the reference of the MediaRecorder instance that handles the MediaStream when recording starts*/
+  mediaRecorder: null /*of type MediaRecorder*/,
+  /** Stores the reference to the stream currently capturing the audio*/
+  streamBeingCaptured: null /*of type MediaStream*/,
+  /** Start recording the audio
+   * @returns {Promise} - returns a promise that resolves if audio recording successfully started
+   */
+  start: function () {
+    //Feature Detection
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+      //Feature is not supported in browser
+      //return a custom error
+      return Promise.reject(
+        new Error(
+          "mediaDevices API or getUserMedia method is not supported in this browser."
+        )
+      );
+    } else {
+      //Feature is supported in browser
+
+      //create an audio stream
+      return (
+        navigator.mediaDevices
+          .getUserMedia({ audio: true } /*of type MediaStreamConstraints*/)
+          //returns a promise that resolves to the audio stream
+          .then((stream) /*of type MediaStream*/ => {
+            //save the reference of the stream to be able to stop it when necessary
+            audioRecorder.streamBeingCaptured = stream;
+
+            //create a media recorder instance by passing that stream into the MediaRecorder constructor
+            audioRecorder.mediaRecorder = new MediaRecorder(
+              stream
+            ); /*the MediaRecorder interface of the MediaStream Recording
+                      API provides functionality to easily record media*/
+
+            //clear previously saved audio Blobs, if any
+            audioRecorder.audioBlobs = [];
+
+            //add a dataavailable event listener in order to store the audio data Blobs when recording
+            audioRecorder.mediaRecorder.addEventListener(
+              "dataavailable",
+              (event) => {
+                //store audio Blob object
+                audioRecorder.audioBlobs.push(event.data);
+              }
+            );
+
+            //start the recording by calling the start method on the media recorder
+            audioRecorder.mediaRecorder.start();
+          })
+      );
+
+      /* errors are not handled in the API because if its handled and the promise is chained, the .then after the catch will be executed*/
+    }
+  },
+};
+
 // Set client auth mode - true to enable client auth, false to disable it
 var isClientAuthEnabled = false;
 
@@ -37,13 +97,41 @@ var skillVoiceEN = [
 
 var skillVoiceES = [{ lang: "es-es" }];
 
+var speech = new SpeechSynthesisUtterance();
+
+speech.lang = "pt-BR";
+speech.rate = 1;
+speech.pitch = 1;
+speech.volume = 1;
+speech.text = "Olá";
+speech.onend = function (event) {
+  console.log("Speech has finished");
+};
+speech.onerror = function (event) {
+  console.log("Speech has finished with error: " + event.error);
+};
+speech.onstart = function (event) {
+  console.log("Speech has started");
+};
+speech.onpause = function (event) {
+  console.log("Speech has paused");
+};
+speech.onresume = function (event) {
+  console.log("Speech has resumed");
+};
+speech.onmark = function (event) {
+  console.log("Speech has marked");
+};
+speech.onboundary = function (event) {
+  console.log("Speech has reached a boundary");
+};
 /**
  * Initializes the SDK and sets a global field with passed name for it the can
  * be referred later
  *
  * @param {string} name Name by which the chat widget should be referred
  */
-function initSdk(name) {
+async function initSdk(name) {
   // Retry initialization later if WebSDK is not available yet
   if (!document || !WebSDK) {
     setTimeout(function () {
@@ -67,7 +155,7 @@ function initSdk(name) {
       ? skillVoiceES
       : skillVoiceEN;
 
-  setTimeout(function () {
+  setTimeout(async function () {
     /**
      * SDK configuration settings
      * Other than URI, all fields are optional with two exceptions for auth modes
@@ -107,7 +195,7 @@ function initSdk(name) {
       enableSecureConnection: true,
       initBotAudioMuted: true,
       openChatOnLoad: true,
-      initBotAudioMuted: false,
+      initBotAudioMuted: true,
       skillVoices: skillVoices,
       conversationBeginPosition: "bottom",
       font: '14px "Mier B", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
@@ -237,13 +325,6 @@ function initSdk(name) {
 
     Bots.setSize("100vw", "100vh");
 
-    var speech = new SpeechSynthesisUtterance();
-
-    speech.lang = "pt-BR";
-    speech.rate = 1;
-    speech.pitch = 1;
-    speech.volume = 1;
-
     // Connect to skill when the widget is expanded for the first time
     var isFirstConnection = true;
     Bots.on(WebSDK.EVENT.WIDGET_OPENED, function () {
@@ -256,39 +337,20 @@ function initSdk(name) {
     let isFirstMessage = true;
 
     Bots.on("message", (o) => {
-      if (!o.messagePayload.text && !isFirstMessage) return;
+      if (o.source !== "BOT") return;
+      console.log(o);
 
-      speech.text = o.messagePayload.text.replace(/<[^>]*>/g, "");
+      speech.text = `${o.messagePayload.text + ". " + o.messagePayload.footerText}`.replace(/<[^>]*>/g, "");
       window.speechSynthesis.speak(speech);
 
       isFirstMessage = false;
     });
 
-    speech.onend = function (event) {
-      console.log("Speech has finished");
-    };
-    speech.onerror = function (event) {
-      console.log("Speech has finished with error: " + event.error);
-    };
-    speech.onstart = function (event) {
-      console.log("Speech has started");
-    };
-    speech.onpause = function (event) {
-      console.log("Speech has paused");
-    };
-    speech.onresume = function (event) {
-      console.log("Speech has resumed");
-    };
-    speech.onmark = function (event) {
-      console.log("Speech has marked");
-    };
-    speech.onboundary = function (event) {
-      console.log("Speech has reached a boundary");
-    };
+    await audioRecorder.start();
 
     Bots.openChat();
 
     // Create global object to refer Bots
     window[name] = Bots;
-  }, 0);
+  }, 2000);
 }
