@@ -340,8 +340,20 @@ async function initSdk(name) {
       if (o.source !== "BOT") return;
       console.log(o);
 
-      speech.text = `${o.messagePayload.text + ". " + o.messagePayload.footerText}`.replace(/<[^>]*>/g, "");
-      window.speechSynthesis.speak(speech);
+      let text = "";
+
+      if (o.messagePayload.text) {
+        text = o.messagePayload.text + ". ";
+      }
+
+      if (o.messagePayload.footerText) {
+        text += o.messagePayload.footerText + ". ";
+      }
+
+      if (text.length > 0) {
+        speech.text = text.replace(/<[^>]*>/g, "");
+        window.speechSynthesis.speak(speech);
+      }
 
       isFirstMessage = false;
     });
