@@ -344,10 +344,12 @@ async function initSdk(name) {
 
       if (o.messagePayload.text) {
         text = o.messagePayload.text + ". ";
+        window.ReactNativeWebView.postMessage(text);
       }
 
       if (o.messagePayload.footerText) {
         text += o.messagePayload.footerText + ". ";
+        window.ReactNativeWebView.postMessage(text);
       }
 
       if (text.length > 0) {
